@@ -20,7 +20,7 @@ import time
 import urllib.error
 import urllib.request
 
-BASE_URL = "http://localhost:5000"
+BASE_URL = "http://localhost:3000"
 MONGO_USER = "admin"
 MONGO_PASS = "admin123"
 MONGO_DB = "hotel"
