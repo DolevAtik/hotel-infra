@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: hotel/backend:latest
+          image: dolevatik/hotel-backend:f3a2d67e8a8e2f8e546aa1072f1ef73e1b9c01c7
           ports:
             - containerPort: 3000
           env:
