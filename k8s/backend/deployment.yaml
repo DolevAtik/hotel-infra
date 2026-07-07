@@ -1,39 +1,30 @@
 apiVersion: apps/v1
 kind: Deployment
+
 metadata:
   name: backend
   namespace: hotel
   labels:
-    app: hotel
-    component: backend
+    app: backend
+
 spec:
-  replicas: 2
+  replicas: 1
+
   selector:
     matchLabels:
-      app: hotel
-      component: backend
+      app: backend
+
   template:
     metadata:
       labels:
-        app: hotel
-        component: backend
+        app: backend
+
     spec:
       containers:
         - name: backend
-          image: hotel/backend:latest
-          ports:
-            - containerPort: 3000
-          env:
-            - name: PORT
-              valueFrom:
-                configMapKeyRef:
-                  name: hotel-config
-                  key: PORT
-            - name: MONGO_URI
-              valueFrom:
-                secretKeyRef:
-                  name: hotel-secret
-                  key: MONGO_URI
+          image: dolevatik/hotel-backend:latest
+          imagePullPolicy: Always
+
           resources:
             requests:
               cpu: "100m"
@@ -41,15 +32,34 @@ spec:
             limits:
               cpu: "500m"
               memory: "512Mi"
+
+          ports:
+            - containerPort: 3000
+
+          env:
+            - name: PORT
+              value: "3000"
+
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-secret
+                  key: MONGO_URI
+
           readinessProbe:
             httpGet:
               path: /health
               port: 3000
-            initialDelaySeconds: 10
+            initialDelaySeconds: 5
             periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+
           livenessProbe:
             httpGet:
               path: /health
               port: 3000
-            initialDelaySeconds: 20
+            initialDelaySeconds: 15
             periodSeconds: 20
+            timeoutSeconds: 2
+            failureThreshold: 3

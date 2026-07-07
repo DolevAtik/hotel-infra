@@ -1,0 +1,46 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: hotel-seed
+  namespace: hotel
+  labels:
+    app: hotel-seed
+spec:
+  # Clean up the finished Job automatically 10 minutes after completion.
+  ttlSecondsAfterFinished: 600
+  backoffLimit: 6
+  template:
+    metadata:
+      labels:
+        app: hotel-seed
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: seed
+          image: mongo:7.0
+          env:
+            # Same MongoDB connection string the backend uses.
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-secret
+                  key: MONGO_URI
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Waiting for MongoDB to accept connections..."
+              until mongosh "$MONGO_URI" --quiet --eval 'db.adminCommand({ ping: 1 })' >/dev/null 2>&1; do
+                echo "  ...not ready yet, retrying in 3s"
+                sleep 3
+              done
+              echo "MongoDB is up. Seeding hotels (idempotent)..."
+              mongosh "$MONGO_URI" --quiet --file /seed/seed_hotels.js
+          volumeMounts:
+            - name: seed-script
+              mountPath: /seed
+              readOnly: true
+      volumes:
+        - name: seed-script
+          configMap:
+            name: hotel-seed-script

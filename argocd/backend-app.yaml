@@ -10,7 +10,7 @@ spec:
   source:
     repoURL: https://github.com/your-org/hotel-infra.git
     targetRevision: main
-    path: kubernetes/backend
+    path: k8s/backend
   destination:
     server: https://kubernetes.default.svc
     namespace: hotel

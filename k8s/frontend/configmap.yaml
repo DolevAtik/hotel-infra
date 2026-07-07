@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hotel-frontend-config
+  namespace: hotel
+  labels:
+    app: hotel-frontend
+data:
+  # Runtime config injected into the static frontend at container start.
+  # The app reads window.__API_BASE__; nginx in the image proxies /api -> backend:3000.
+  config.js: |
+    window.__API_BASE__ = "/api";
