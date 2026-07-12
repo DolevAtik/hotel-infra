@@ -22,7 +22,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: dolevatik/hotel-backend:3
+          image: dolevatik/hotel-backend:c2c216203a6c07a2b9b973dc4be1e2ef82d1f13c
           imagePullPolicy: Always
 
           resources:
