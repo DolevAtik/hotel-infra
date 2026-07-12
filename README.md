@@ -11,7 +11,7 @@ hotel-infra
 ├── docker-compose.yml          # הרצה מקומית של כל השירותים
 ├── k8s/
 │   ├── namespace.yaml          # namespace בשם hotel
-│   ├── frontend/               # Deployment + Service (ClusterIP) + ConfigMap (config.js בזמן ריצה)
+│   ├── frontend/               # Deployment + Service (ClusterIP) + ConfigMap (config.js בזמן ריצה) + Ingress (/ ו-/api)
 │   ├── backend/                # Deployment + Service (ClusterIP)
 │   ├── mongodb/                # Deployment + Service (ClusterIP) + Secret + PVC
 │   └── seed/                   # Job + ConfigMap לזריעת מלונות (אידמפוטנטי)
@@ -41,9 +41,11 @@ hotel-infra
 
 ה-frontend פונה ל-backend דרך הנתיב היחסי `/api` (nginx בתוך image ה-frontend
 מפנה ל-`backend:3000`), וה-backend פונה ל-mongodb. נתוני MongoDB נשמרים על PVC
-כדי לשרוד הפעלות מחדש של ה-Pod. מכיוון שה-frontend הוא `ClusterIP`, גישה מבחוץ
-היא דרך `kubectl port-forward` או Ingress. (mongo-express קיים רק בהרצה המקומית
-עם Docker Compose, לא ב-Kubernetes.)
+כדי לשרוד הפעלות מחדש של ה-Pod. השירותים הם `ClusterIP`, והחשיפה החוצה היא דרך
+ה-Ingress שב-`k8s/frontend/ingress.yaml` (host `hotel.local`, מחלקה `nginx`) —
+`/` מגיע ל-frontend ו-`/api` מנותב ל-`backend:3000` עם הסרת הקידומת. לחלופין
+`kubectl port-forward`. (mongo-express קיים רק בהרצה המקומית עם Docker Compose,
+לא ב-Kubernetes.)
 
 ## הרצה מקומית (Docker Compose)
 
@@ -84,7 +86,7 @@ kubectl apply -f k8s/namespace.yaml
 
 kubectl apply -f k8s/mongodb/     # Secret + PVC + Deployment + Service
 kubectl apply -f k8s/backend/
-kubectl apply -f k8s/frontend/    # Deployment + Service + ConfigMap (config.js)
+kubectl apply -f k8s/frontend/    # Deployment + Service + ConfigMap (config.js) + Ingress
 
 # זריעת מלונות לדוגמה (Job אידמפוטנטי — אפשר להריץ שוב בבטחה):
 kubectl apply -f k8s/seed/

@@ -1,0 +1,55 @@
+# Single host serves the SPA and proxies the API under /api, so the browser
+# only ever talks to one origin (matches window.__API_BASE__ = "/api").
+#
+# Two Ingress objects on purpose: nginx-ingress applies the rewrite annotation
+# per-Ingress, so the /api rewrite must be isolated from the "/" frontend path —
+# otherwise the rewrite would also mangle requests for /, /app.js, /config.js.
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hotel-frontend
+  namespace: hotel
+  labels:
+    app: hotel-frontend
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: hotel.local            # <-- change to your real domain
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hotel-frontend
+                port:
+                  number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hotel-api
+  namespace: hotel
+  labels:
+    app: hotel-frontend
+  annotations:
+    # Strip the /api prefix: the backend serves its routes at the root
+    # (e.g. /hotels, /reservations), not under /api.
+    #   /api/hotels          -> /hotels
+    #   /api/reservations/42 -> /reservations/42
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: hotel.local            # <-- must match the frontend host above
+      http:
+        paths:
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 3000
