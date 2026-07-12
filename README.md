@@ -1,130 +1,249 @@
-# hotel-infra
+<div align="center">
 
-תשתית פריסה (Infrastructure) לאפליקציית מלון, הכוללת **Frontend**, **Backend**, **MongoDB**
-ו-**mongo-express**. מיועדת להרצה מקומית עם Docker Compose ולפריסה לקלאסטר Kubernetes
-דרך ArgoCD (GitOps).
+# 🏨 Hotel Platform — GitOps Infrastructure
 
-## מבנה הפרויקט
+**Declarative, self-healing delivery of a 3-tier microservices app to Kubernetes — powered by Argo CD & GitHub Actions.**
+
+Every commit flows from `git push` to a running Pod with **zero manual `kubectl apply`**. Git is the single source of truth; the cluster continuously reconciles itself to match it.
+
+<br/>
+
+![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white)
+![Argo CD](https://img.shields.io/badge/Argo%20CD-EF7B4D?style=for-the-badge&logo=argo&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![Kustomize](https://img.shields.io/badge/Kustomize-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white)
+
+![Python](https://img.shields.io/badge/Flask%20%2B%20Gunicorn-000000?style=for-the-badge&logo=flask&logoColor=white)
+![React](https://img.shields.io/badge/React%20SPA-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+![NGINX](https://img.shields.io/badge/NGINX%20Ingress-009639?style=for-the-badge&logo=nginx&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-47A248?style=for-the-badge&logo=mongodb&logoColor=white)
+
+</div>
+
+---
+
+## 📌 What this project demonstrates
+
+This repository is the **infrastructure & delivery layer** for a hotel-booking application. It is deliberately built to showcase production-minded DevOps practices end to end:
+
+- **GitOps with Argo CD** — the cluster's desired state lives in Git; Argo CD reconciles automatically with `selfHeal` (drift correction) and `prune` (garbage collection).
+- **Fully automated CI/CD** — application repos build, test, push immutable images, and open a Pull Request against *this* repo. Merge = deploy.
+- **Immutable, traceable image tags** — every image is tagged with the **Git commit SHA**, so any running Pod is traceable back to an exact source commit (`:latest` kept only for convenience).
+- **Declarative Kubernetes with Kustomize** — one `kustomization.yaml` composes the whole stack; a single Argo CD `Application` owns it.
+- **12-Factor runtime configuration** — the frontend image is built once and configured **at runtime** via a mounted `config.js` (ConfigMap), so the same artifact ships to every environment.
+- **Operational hygiene** — readiness/liveness probes, CPU/memory requests & limits, a persistent volume for stateful data, and an **idempotent** database seed Job.
+- **Single-origin ingress** — one host serves the SPA and proxies the API under `/api`, eliminating CORS and simplifying the browser's trust model.
+
+---
+
+## 🏗️ Architecture
+
+### Runtime topology (inside the cluster)
+
+```mermaid
+flowchart TD
+    User([Browser]) -->|hotel.local| ING[NGINX Ingress]
+
+    ING -->|"/"| FE["frontend: React SPA + NGINX<br/>5 replicas - port 80"]
+    ING -->|"/api -> rewrite"| BE["backend: Flask + Gunicorn<br/>port 3000"]
+
+    BE --> DB[("mongodb<br/>mongo:7.0 - port 27017")]
+    DB --- PVC[("PersistentVolume<br/>/data/db")]
+
+    SEED["seed Job<br/>idempotent"] -.->|"waits for + seeds"| DB
+    CM["ConfigMap<br/>config.js"] -.->|runtime API base| FE
+    SEC["Secret<br/>mongodb-secret"] -.->|MONGO_URI| BE
+
+    classDef svc fill:#326CE5,stroke:#1b3a7a,color:#fff;
+    classDef data fill:#47A248,stroke:#2d6a2f,color:#fff;
+    class FE,BE svc;
+    class DB,PVC data;
+```
+
+| Component | Role | Tech | Port | Exposure | Notes |
+|-----------|------|------|------|----------|-------|
+| **frontend** | User interface | React SPA served by NGINX | 80 | ClusterIP | 5 replicas · runtime config via ConfigMap · probes · resource limits |
+| **backend** | REST API | Python 3.12 · Flask · Gunicorn | 3000 | ClusterIP | `/health` probes · `MONGO_URI` from Secret · resource limits |
+| **mongodb** | Database | mongo:7.0 | 27017 | ClusterIP | Backed by a PVC to survive Pod restarts |
+| **seed** | Data bootstrap | mongo:7.0 (`mongosh`) | — | Job | Waits for DB, then seeds hotels idempotently |
+| **ingress** | Edge routing | NGINX Ingress | — | LB/Host | `/` → frontend, `/api(/\|$)(.*)` → `backend:3000` with prefix rewrite |
+
+> The browser only ever talks to **one origin**. `/` serves the SPA; `/api/hotels` is rewritten to `/hotels` on `backend:3000`. Two `Ingress` objects are used intentionally so the API rewrite annotation is isolated from the SPA path.
+
+---
+
+## 🔄 The GitOps delivery pipeline
+
+The core of the project. A developer never touches the cluster — they just push code.
+
+```mermaid
+flowchart LR
+    DEV([git push - app repo dev]) --> GHA
+
+    subgraph CI["GitHub Actions - app repo"]
+        GHA["Build & Test"] --> IMG["Build image<br/>tag = git SHA"]
+        IMG --> HUB[(Docker Hub)]
+        HUB --> PR[Open PR to<br/>hotel-infra]
+    end
+
+    PR --> MERGE([Merge PR to main])
+
+    subgraph CD["Argo CD (in-cluster)"]
+        MERGE --> SYNC[Detect drift<br/>OutOfSync]
+        SYNC --> APPLY["Auto-sync<br/>selfHeal + prune"]
+    end
+
+    APPLY --> K8S([Kubernetes<br/>rolling update])
+```
+
+**How it works, step by step:**
+
+1. A developer pushes to `dev` in an **application** repo (`hotel-backend` / `hotel-frontend`).
+2. **GitHub Actions** builds the app, runs a smoke test, and builds a Docker image tagged with the **commit SHA** (+ `:latest`), pushing both to **Docker Hub**.
+3. A second job checks out **this repo** and bumps the image tag in `k8s/<component>/deployment.yaml`, then opens a **Pull Request** (`peter-evans/create-pull-request`).
+4. A human **reviews and merges** the PR into `main` — the only manual gate, and the audit trail.
+5. **Argo CD** (tracking `main`, path `k8s`) detects the change, shows `OutOfSync`, and **auto-syncs**.
+6. Kubernetes performs a **rolling update**; Argo CD reports `Synced / Healthy`.
+
+> ✅ **Validated end-to-end.** A backend commit was traced from `git push` all the way to the live Deployment image flipping from `:3` to its full commit SHA, with Argo CD reconciling automatically — no manual `kubectl` in the path.
+
+---
+
+## 📂 Repository structure
 
 ```
 hotel-infra
-├── docker-compose.yml          # הרצה מקומית של כל השירותים
-├── k8s/
-│   ├── namespace.yaml          # namespace בשם hotel
-│   ├── frontend/               # Deployment + Service (ClusterIP) + ConfigMap (config.js בזמן ריצה) + Ingress (/ ו-/api)
-│   ├── backend/                # Deployment + Service (ClusterIP)
-│   ├── mongodb/                # Deployment + Service (ClusterIP) + Secret + PVC
-│   └── seed/                   # Job + ConfigMap לזריעת מלונות (אידמפוטנטי)
 ├── argocd/
-│   ├── frontend-app.yaml       # ArgoCD Application ל-frontend (path: k8s/frontend)
-│   └── backend-app.yaml        # ArgoCD Application ל-backend (path: k8s/backend)
+│   └── hotel-app.yaml          # Single Argo CD Application → path k8s/ (owns the whole stack)
+├── k8s/
+│   ├── kustomization.yaml      # Composes every manifest below
+│   ├── namespace.yaml          # namespace: hotel
+│   ├── mongodb/                # Secret + PVC + Deployment + Service
+│   ├── backend/                # Deployment + Service (ClusterIP :3000)
+│   ├── frontend/               # Deployment + Service + ConfigMap (config.js) + Ingress (/, /api)
+│   └── seed/                   # Idempotent seed Job + ConfigMap (seed script)
 ├── scripts/
-│   ├── seed_hotels.js          # זריעת מלונות לדוגמה ל-MongoDB (מקור האמת לנתוני הזריעה)
-│   └── smoke_test.py           # בדיקת עשן ל-backend מול MongoDB
-├── .env.example                # תבנית למשתני סביבה
+│   ├── seed_hotels.js          # Source of truth for demo hotel data
+│   └── smoke_test.py           # Backend ↔ MongoDB smoke test
+├── docker-compose.yml          # Full local stack (adds mongo-express)
+├── .env.example                # Environment template
 └── README.md
 ```
 
-> **תמונת מצב על הפריסה ל-Kubernetes:** ה-manifests תואמים לקלאסטר הפעיל —
-> images מ-Docker Hub (`dolevatik/hotel-backend`, `dolevatik/hotel-frontend`),
-> labels בסגנון `app: <component>`, ו-Secret בשם `mongodb-secret`. ה-frontend
-> קורא ל-API היחסי `/api` (nginx מפנה ל-`backend:3000`) לפי `config.js` שמוזרק
-> מ-ConfigMap בזמן ריצה. הזריעה של המלונות מתבצעת דרך `k8s/seed/` (Job).
+---
 
-## ארכיטקטורה
+## 🚀 Deploy via Argo CD (GitOps — recommended)
 
-| רכיב           | תפקיד                       | פורט פנימי | חשיפה (Kubernetes)   |
-|----------------|-----------------------------|-----------|----------------------|
-| frontend       | ממשק משתמש (React/Nginx)    | 80        | ClusterIP            |
-| backend        | API                         | 3000      | ClusterIP            |
-| mongodb        | בסיס נתונים                  | 27017     | ClusterIP            |
+A **single** Argo CD `Application` owns the entire stack (namespace, DB, backend, frontend, seed) via Kustomize:
 
-ה-frontend פונה ל-backend דרך הנתיב היחסי `/api` (nginx בתוך image ה-frontend
-מפנה ל-`backend:3000`), וה-backend פונה ל-mongodb. נתוני MongoDB נשמרים על PVC
-כדי לשרוד הפעלות מחדש של ה-Pod. השירותים הם `ClusterIP`, והחשיפה החוצה היא דרך
-ה-Ingress שב-`k8s/frontend/ingress.yaml` (host `hotel.local`, מחלקה `nginx`) —
-`/` מגיע ל-frontend ו-`/api` מנותב ל-`backend:3000` עם הסרת הקידומת. לחלופין
-`kubectl port-forward`. (mongo-express קיים רק בהרצה המקומית עם Docker Compose,
-לא ב-Kubernetes.)
+```bash
+kubectl apply -f argocd/hotel-app.yaml
+```
 
-## הרצה מקומית (Docker Compose)
+```yaml
+# argocd/hotel-app.yaml (excerpt)
+source:
+  repoURL: https://github.com/DolevAtik/hotel-infra.git
+  targetRevision: main
+  path: k8s
+syncPolicy:
+  automated:
+    prune: true       # delete resources removed from Git
+    selfHeal: true    # revert manual cluster drift back to Git
+  syncOptions:
+    - CreateNamespace=true
+```
 
-צור קובץ `.env` באותה תיקייה (אפשר להעתיק מ-`.env.example`):
+From here on, **Git is the deploy button** — merge to `main` and the cluster follows.
+
+---
+
+## ⚙️ Deploy manually with Kustomize (no Argo CD)
+
+The same manifests apply directly, in dependency order (namespace → storage/secret → workloads → seed):
+
+```bash
+kubectl apply -k k8s/
+```
+
+---
+
+## 💻 Run locally (Docker Compose)
+
+Great for developing without a cluster. Copy `.env.example` → `.env` and fill in credentials:
 
 ```env
 MONGO_ROOT_USERNAME=admin
-MONGO_ROOT_PASSWORD=admin123
+MONGO_ROOT_PASSWORD=change-me
 ME_USERNAME=admin
-ME_PASSWORD=admin123
+ME_PASSWORD=change-me
 ```
-
-ואז:
 
 ```bash
 docker compose up -d --build
 ```
 
-כתובות (לפי הפורטים שמפורסמים ב-`docker-compose.yml`):
-- Frontend:      http://localhost:8080
-- Backend API:   http://localhost:3000
-- mongo-express: http://localhost:8081
-- MongoDB:       mongodb://localhost:27017
-
-עצירה:
+| Service        | URL                          |
+|----------------|------------------------------|
+| Frontend       | http://localhost:8080        |
+| Backend API    | http://localhost:3000        |
+| mongo-express  | http://localhost:8081        |
+| MongoDB        | mongodb://localhost:27017    |
 
 ```bash
-docker compose down          # שמירה על הנתונים
-docker compose down -v       # מחיקת הנתונים (volume)
+docker compose down       # stop, keep data
+docker compose down -v    # stop, wipe the data volume
 ```
 
-## פריסה ל-Kubernetes (ידנית)
+---
 
-חשוב להחיל לפי הסדר (namespace ← storage/secret ← workloads ← seed):
-
-```bash
-kubectl apply -f k8s/namespace.yaml
-
-kubectl apply -f k8s/mongodb/     # Secret + PVC + Deployment + Service
-kubectl apply -f k8s/backend/
-kubectl apply -f k8s/frontend/    # Deployment + Service + ConfigMap (config.js) + Ingress
-
-# זריעת מלונות לדוגמה (Job אידמפוטנטי — אפשר להריץ שוב בבטחה):
-kubectl apply -f k8s/seed/
-```
-
-בדיקה:
+## ✅ Verify a deployment
 
 ```bash
+# Argo CD application health & sync state
+kubectl get applications -n argocd
+# → hotel   Synced   Healthy
+
+# Everything in the app namespace
 kubectl get all -n hotel
-kubectl get pvc -n hotel
-kubectl logs -n hotel job/hotel-seed        # פלט הזריעה (inserted/exists + total)
 
-# גישה ל-frontend (ClusterIP): port-forward מקומי
-kubectl port-forward -n hotel svc/hotel-frontend 8080:80
-# ואז http://localhost:8080
+# Prove the running image matches the merged commit SHA
+kubectl get deployment backend -n hotel \
+  -o=jsonpath="{.spec.template.spec.containers[0].image}"
+# → dolevatik/hotel-backend:<git-sha>
+
+# Seed Job output (inserted / already-exists + total)
+kubectl logs -n hotel job/hotel-seed
 ```
 
-## פריסה דרך ArgoCD (GitOps)
+---
 
-1. דחוף את הריפו ל-Git ועדכן את `repoURL` בקבצי `argocd/*.yaml`.
-2. החל את האפליקציות:
+## 🔒 Security notes
 
-```bash
-kubectl apply -f argocd/frontend-app.yaml
-kubectl apply -f argocd/backend-app.yaml
-```
+- `k8s/mongodb/secret.yaml` ships **sample credentials only**. Replace them and never commit real secrets — use [Sealed Secrets](https://github.com/bitnami-labs/sealed-secrets) or [External Secrets Operator](https://external-secrets.io/) for production.
+- Docker Hub and GitHub credentials (`DOCKER_USERNAME`, `DOCKER_PASSWORD`, `PAT`) live in **GitHub Actions secrets**, never in the repo.
+- Merging to `main` is the intentional human gate on every deploy — the change history is the audit log.
 
-ArgoCD יסנכרן אוטומטית (`automated` עם `prune` ו-`selfHeal`) את התיקיות
-`k8s/frontend` ו-`k8s/backend` אל ה-namespace `hotel`.
+---
 
-> הערה: ה-Application של ArgoCD מצביעים על תיקיות `frontend`/`backend` בלבד.
-> את רכיבי התשתית המשותפים (namespace, mongodb כולל Secret/PVC) ואת ה-Job
-> שב-`k8s/seed/` יש להחיל ידנית, או להוסיף עבורם Application/`app-of-apps` נוסף.
+## 🗺️ Roadmap
 
-## אבטחה
+Honest next steps toward a production-grade platform:
 
-- `k8s/mongodb/secret.yaml` מכיל ערכים לדוגמה בלבד (`admin`/`admin123`). **החלף אותם**
-  לפני שימוש אמיתי, ואל תשמור סודות אמיתיים ב-Git. שקול
-  [Sealed Secrets](https://github.com/bitnami-labs/sealed-secrets) או
-  External Secrets.
-- שנה את פרטי ה-Basic Auth של mongo-express בסביבת ייצור (רלוונטי להרצה המקומית עם Docker Compose).
+- [ ] **Sealed Secrets / External Secrets** to remove plaintext credentials from Git
+- [ ] **Observability** — Prometheus + Grafana dashboards and alerting
+- [ ] **Progressive delivery** — Argo Rollouts (canary / blue-green) instead of rolling updates
+- [ ] **App-of-Apps** pattern to scale to multiple environments (dev / staging / prod)
+- [ ] **Policy & supply chain** — image scanning (Trivy) and admission policy (Kyverno/OPA)
+- [ ] **TLS** at the ingress via cert-manager + Let's Encrypt
+
+---
+
+<div align="center">
+
+**Built by [Dolev Atik](https://github.com/DolevAtik)** · DevOps Engineer
+
+*Companion application repos: [`hotel-backend`](https://github.com/DolevAtik/hotel-backend) · [`hotel-frontend`](https://github.com/DolevAtik/hotel-frontend)*
+
+</div>
