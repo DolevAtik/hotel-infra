@@ -126,6 +126,8 @@ hotel-infra
 ├── scripts/
 │   ├── seed_hotels.js          # Source of truth for demo hotel data
 │   └── smoke_test.py           # Backend ↔ MongoDB smoke test
+├── docs/
+│   └── VALIDATION.md           # End-to-end test & validation report (incident log + raw output)
 ├── docker-compose.yml          # Full local stack (adds mongo-express)
 ├── .env.example                # Environment template
 └── README.md
@@ -216,6 +218,8 @@ kubectl get deployment backend -n hotel \
 # Seed Job output (inserted / already-exists + total)
 kubectl logs -n hotel job/hotel-seed
 ```
+
+> 📄 A full, reproducible validation run — the nine checks above with **real output**, plus an honest **incident log** of the failures hit and fixed along the way — is documented in **[docs/VALIDATION.md](docs/VALIDATION.md)**.
 
 ---
 

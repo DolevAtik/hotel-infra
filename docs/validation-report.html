@@ -1,0 +1,401 @@
+<title>דוח אימות — Hotel Platform GitOps</title>
+
+<style>
+  :root {
+    --sans: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+    --mono: "Cascadia Code", ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+    --ground: #E9EDF4;
+    --surface: #FFFFFF;
+    --surface-2: #F2F5FB;
+    --border: #D2DAE7;
+    --ink: #15233E;
+    --ink-soft: #57637C;
+    --accent: #2F6FED;
+    --accent-soft: #E4ECFD;
+    --pass: #0F9B4E;
+    --pass-soft: #E0F4E9;
+    --warn: #B96C0E;
+    --warn-soft: #F8ECD8;
+
+    --term-bg: #0E1A2C;
+    --term-bar: #182740;
+    --term-ink: #C9D6EA;
+    --term-dim: #6B7C97;
+    --term-green: #5FD08A;
+    --term-blue: #6AA6FF;
+    --term-amber: #E7B45A;
+
+    --shadow: 0 1px 2px rgba(20,35,62,.05), 0 8px 24px -12px rgba(20,35,62,.18);
+    --radius: 12px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #0A1120;
+      --surface: #111B2D;
+      --surface-2: #16223A;
+      --border: #253248;
+      --ink: #E7EDF8;
+      --ink-soft: #97A5BD;
+      --accent: #5C93FF;
+      --accent-soft: #182741;
+      --pass: #34C67E;
+      --pass-soft: #102C1D;
+      --warn: #E0A03C;
+      --warn-soft: #2E240F;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 30px -14px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0A1120; --surface: #111B2D; --surface-2: #16223A; --border: #253248;
+    --ink: #E7EDF8; --ink-soft: #97A5BD; --accent: #5C93FF; --accent-soft: #182741;
+    --pass: #34C67E; --pass-soft: #102C1D; --warn: #E0A03C; --warn-soft: #2E240F;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 30px -14px rgba(0,0,0,.6);
+  }
+  :root[data-theme="light"] {
+    --ground: #E9EDF4; --surface: #FFFFFF; --surface-2: #F2F5FB; --border: #D2DAE7;
+    --ink: #15233E; --ink-soft: #57637C; --accent: #2F6FED; --accent-soft: #E4ECFD;
+    --pass: #0F9B4E; --pass-soft: #E0F4E9; --warn: #B96C0E; --warn-soft: #F8ECD8;
+    --shadow: 0 1px 2px rgba(20,35,62,.05), 0 8px 24px -12px rgba(20,35,62,.18);
+  }
+
+  * { box-sizing: border-box; }
+
+  .page {
+    direction: rtl;
+    font-family: var(--sans);
+    background: var(--ground);
+    color: var(--ink);
+    min-height: 100vh;
+    padding: clamp(20px, 4vw, 56px) clamp(16px, 4vw, 40px) 64px;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; }
+
+  .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .ltr { direction: ltr; unicode-bidi: isolate; }
+
+  /* ---------- Header ---------- */
+  header.hero {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: clamp(22px, 3.5vw, 38px);
+    position: relative;
+    overflow: hidden;
+  }
+  header.hero::before {
+    content: "";
+    position: absolute; inset-block: 0; inset-inline-start: 0;
+    width: 4px;
+    background: linear-gradient(var(--pass), var(--accent));
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: .72rem;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 14px;
+  }
+  h1 {
+    font-size: clamp(1.7rem, 4.4vw, 2.5rem);
+    line-height: 1.12;
+    letter-spacing: -.015em;
+    text-wrap: balance;
+    margin: 0 0 8px;
+    font-weight: 700;
+  }
+  .lede { color: var(--ink-soft); font-size: 1.02rem; margin: 0 0 22px; max-width: 60ch; }
+
+  .verdict {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: var(--pass-soft);
+    color: var(--pass);
+    border: 1px solid color-mix(in srgb, var(--pass) 35%, transparent);
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: .95rem;
+  }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 0 currentColor; animation: pulse 2.4s infinite; }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 color-mix(in srgb,currentColor 55%,transparent);} 70%{box-shadow:0 0 0 8px transparent;} 100%{box-shadow:0 0 0 0 transparent;} }
+  @media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
+
+  .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+  .chip {
+    font-family: var(--mono); font-size: .74rem;
+    background: var(--surface-2); border: 1px solid var(--border);
+    color: var(--ink-soft);
+    padding: 5px 10px; border-radius: 7px;
+  }
+  .chip b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- Section scaffolding ---------- */
+  section { margin-top: clamp(30px, 5vw, 48px); }
+  .sec-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; }
+  .sec-num {
+    font-family: var(--mono); font-size: .78rem; font-weight: 600;
+    color: var(--accent); letter-spacing: .05em;
+  }
+  h2 { font-size: 1.28rem; margin: 0; font-weight: 700; letter-spacing: -.01em; }
+  .sec-sub { color: var(--ink-soft); font-size: .92rem; margin: 0 0 18px; }
+
+  /* ---------- Results table ---------- */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
+  }
+  .table-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+  thead th {
+    text-align: right; font-family: var(--mono); font-size: .7rem;
+    text-transform: uppercase; letter-spacing: .1em; color: var(--ink-soft);
+    background: var(--surface-2); padding: 12px 18px; font-weight: 600;
+    border-bottom: 1px solid var(--border); white-space: nowrap;
+  }
+  tbody td { padding: 13px 18px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--surface-2); }
+  td.check { font-weight: 600; white-space: nowrap; }
+  td.result { color: var(--ink-soft); }
+  td.result .mono { color: var(--ink); }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: .78rem; font-weight: 600;
+    padding: 4px 10px; border-radius: 999px; white-space: nowrap;
+  }
+  .pill.pass { background: var(--pass-soft); color: var(--pass); }
+  .pill.pass::before { content: "✓"; font-weight: 700; }
+
+  /* ---------- Traceability hero fact ---------- */
+  .trace {
+    display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: stretch;
+  }
+  @media (max-width: 640px) { .trace { grid-template-columns: 1fr; } }
+  .trace-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow);
+  }
+  .trace-label { font-family: var(--mono); font-size: .68rem; text-transform: uppercase; letter-spacing: .1em; color: var(--ink-soft); margin: 0 0 10px; }
+  .trace-val { font-family: var(--mono); font-size: .82rem; word-break: break-all; line-height: 1.5; }
+  .sha { color: var(--accent); font-weight: 600; }
+  .trace-mid {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 6px; color: var(--pass); font-weight: 700;
+  }
+  .trace-mid .eq { font-family: var(--mono); font-size: 1.6rem; }
+  .trace-mid .badge {
+    font-size: .68rem; letter-spacing: .12em; background: var(--pass-soft);
+    padding: 4px 10px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--pass) 35%, transparent);
+  }
+  @media (max-width: 640px) { .trace-mid .eq { transform: rotate(90deg); } }
+
+  /* ---------- Terminal ---------- */
+  .term {
+    background: var(--term-bg); border-radius: var(--radius); overflow: hidden;
+    border: 1px solid #0a1322; box-shadow: var(--shadow); margin-bottom: 16px;
+  }
+  .term-bar {
+    display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+    background: var(--term-bar); border-bottom: 1px solid #0a1322;
+  }
+  .term-bar i { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+  .term-bar i:nth-child(1){ background:#ff5f57;} .term-bar i:nth-child(2){ background:#febc2e;} .term-bar i:nth-child(3){ background:#28c840;}
+  .term-title { margin-inline-start: 8px; font-family: var(--mono); font-size: .72rem; color: var(--term-dim); }
+  pre.term-body {
+    margin: 0; padding: 16px 18px; direction: ltr; text-align: left;
+    font-family: var(--mono); font-size: .8rem; line-height: 1.65;
+    color: var(--term-ink); overflow-x: auto; white-space: pre;
+  }
+  .term-body .p { color: var(--term-green); }   /* prompt $ */
+  .term-body .c { color: var(--term-blue); }     /* command */
+  .term-body .g { color: var(--term-green); }
+  .term-body .a { color: var(--term-amber); }
+  .term-body .d { color: var(--term-dim); }
+
+  /* ---------- Incident log ---------- */
+  .incident {
+    background: var(--surface); border: 1px solid var(--border);
+    border-inline-start: 4px solid var(--warn);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 18px 20px; margin-bottom: 14px;
+    display: grid; grid-template-columns: auto 1fr; gap: 6px 18px; align-items: start;
+  }
+  .inc-sha {
+    grid-row: span 2; align-self: start;
+    font-family: var(--mono); font-size: .78rem; font-weight: 600;
+    background: var(--warn-soft); color: var(--warn);
+    padding: 5px 9px; border-radius: 7px; white-space: nowrap;
+  }
+  .inc-title { font-weight: 700; font-size: 1rem; }
+  .inc-body { color: var(--ink-soft); font-size: .92rem; }
+  .inc-body b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- Callout ---------- */
+  .callout {
+    background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+    border-radius: var(--radius); padding: 16px 20px; font-size: .92rem; color: var(--ink);
+  }
+  .callout .k { font-family: var(--mono); font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); display: block; margin-bottom: 6px; }
+
+  footer.foot {
+    margin-top: 44px; padding-top: 20px; border-top: 1px solid var(--border);
+    color: var(--ink-soft); font-size: .84rem; text-align: center;
+  }
+  footer.foot .mono { color: var(--ink); }
+</style>
+
+<div class="page">
+<div class="wrap">
+
+  <header class="hero">
+    <p class="eyebrow">GitOps · Kubernetes · Argo CD · Docker</p>
+    <h1>דוח בדיקות ואימות — Hotel Platform</h1>
+    <p class="lede">אימות מקצה לקצה של פריסת GitOps: מקומיט ב-Git ועד Pod רץ בקלאסטר, כולל יומן התקלות שאובחנו ותוקנו בדרך.</p>
+    <span class="verdict"><span class="dot"></span> Argo CD: Synced / Healthy — כל הבדיקות עברו</span>
+    <div class="meta">
+      <span class="chip">תאריך&nbsp;<b>2026-07-12</b></span>
+      <span class="chip">context&nbsp;<b class="ltr">docker-desktop</b></span>
+      <span class="chip">namespace&nbsp;<b class="ltr">hotel</b></span>
+      <span class="chip">בדיקות&nbsp;<b>9 / 9 עברו</b></span>
+    </div>
+  </header>
+
+  <!-- 1. Results summary -->
+  <section>
+    <div class="sec-head"><span class="sec-num">01</span><h2>סיכום תוצאות</h2></div>
+    <p class="sec-sub">תשע בדיקות, משלוש רמות: תשתית GitOps, ריצה ב-Kubernetes, ותפקוד פונקציונלי של ה-API.</p>
+    <div class="card table-scroll">
+      <table>
+        <thead>
+          <tr><th>בדיקה</th><th>תוצאה שהתקבלה</th><th>סטטוס</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="check">Argo CD Application</td><td class="result"><span class="mono ltr">hotel → Synced / Healthy</span></td><td><span class="pill pass">עבר</span></td></tr>
+          <tr><td class="check">Backend Deployment</td><td class="result"><span class="mono ltr">1/1</span> Running</td><td><span class="pill pass">עבר</span></td></tr>
+          <tr><td class="check">Frontend Deployment</td><td class="result"><span class="mono ltr">5/5</span> Running · 5 replicas</td><td><span class="pill pass">עבר</span></td></tr>
+          <tr><td class="check">MongoDB Deployment</td><td class="result"><span class="mono ltr">1/1</span> Running · מגובה ב-PVC</td><td><span class="pill pass">עבר</span></td></tr>
+          <tr><td class="check">Seed Job</td><td class="result"><span class="mono ltr">Complete 1/1</span></td><td><span class="pill pass">עבר</span></td></tr>
+          <tr><td class="check">Image ↔ Commit SHA</td><td class="result">התג על הקלאסטר תואם לקומיט האחרון ב-<span class="mono ltr">main</span></td><td><span class="pill pass">עבר</span></td></tr>
+          <tr><td class="check">אידמפוטנטיות Seed</td><td class="result"><span class="mono ltr">exists ×4 · total 4</span> — אין כפילויות</td><td><span class="pill pass">עבר</span></td></tr>
+          <tr><td class="check">Backend&nbsp;<span class="mono ltr">/health</span></td><td class="result"><span class="mono ltr">{"status":"ok"}</span></td><td><span class="pill pass">עבר</span></td></tr>
+          <tr><td class="check">Backend&nbsp;<span class="mono ltr">/hotels</span></td><td class="result">מחזיר JSON עם רשימת מלונות</td><td><span class="pill pass">עבר</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 2. Traceability -->
+  <section>
+    <div class="sec-head"><span class="sec-num">02</span><h2>הוכחת עקיבוּת (Traceability)</h2></div>
+    <p class="sec-sub">ההוכחה החזקה ביותר ל-GitOps: ה-image שרץ על הקלאסטר זהה בדיוק ל-SHA של הקומיט האחרון שמוזג — בלי <span class="mono ltr">kubectl apply</span> ידני בדרך.</p>
+    <div class="trace">
+      <div class="trace-box">
+        <p class="trace-label">Image שרץ על הקלאסטר</p>
+        <div class="trace-val ltr">dolevatik/hotel-backend:<br><span class="sha">c2c216203a6c07a2b9b973dc4be1e2ef82d1f13c</span></div>
+      </div>
+      <div class="trace-mid">
+        <span class="eq">==</span>
+        <span class="badge">MATCH</span>
+      </div>
+      <div class="trace-box">
+        <p class="trace-label">קומיט אחרון ב-main</p>
+        <div class="trace-val ltr">002eb13 — Update backend image to<br><span class="sha">c2c216203a6c07a2b9b973dc4be1e2ef82d1f13c</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Raw evidence -->
+  <section>
+    <div class="sec-head"><span class="sec-num">03</span><h2>הפלט הגולמי (Raw evidence)</h2></div>
+    <p class="sec-sub">הפקודות שהורצו בפועל מול הקלאסטר החי, והפלט שהתקבל.</p>
+
+    <div class="term">
+      <div class="term-bar"><i></i><i></i><i></i><span class="term-title">argocd + kubernetes status</span></div>
+<pre class="term-body"><span class="p">$</span> <span class="c">kubectl get applications -n argocd</span>
+NAME    SYNC STATUS   HEALTH STATUS
+hotel   <span class="g">Synced        Healthy</span>
+
+<span class="p">$</span> <span class="c">kubectl get all -n hotel</span>
+NAME                                  READY   STATUS      AGE
+pod/backend-b9b4999b-hjb4n            <span class="g">1/1</span>     Running     12m
+pod/hotel-frontend-76cfd9854f-2x9zj   <span class="g">1/1</span>     Running     25m   <span class="d">(×5 replicas)</span>
+pod/hotel-seed-hcbjt                  0/1     <span class="g">Completed</span>   5m
+pod/mongodb-7598fd59d9-cm5tp          <span class="g">1/1</span>     Running     13d
+deployment.apps/backend          <span class="g">1/1</span>   deployment.apps/hotel-frontend   <span class="g">5/5</span>
+job.batch/hotel-seed   <span class="g">Complete   1/1</span>   5s</pre>
+    </div>
+
+    <div class="term">
+      <div class="term-bar"><i></i><i></i><i></i><span class="term-title">traceability: image == commit</span></div>
+<pre class="term-body"><span class="p">$</span> <span class="c">kubectl get deployment backend -n hotel \
+    -o=jsonpath="{.spec.template.spec.containers[0].image}"</span>
+dolevatik/hotel-backend:<span class="a">c2c216203a6c07a2b9b973dc4be1e2ef82d1f13c</span>
+
+<span class="p">$</span> <span class="c">git log --oneline -1 --grep="Update backend image"</span>
+002eb13 Update backend image to <span class="a">c2c216203a6c07a2b9b973dc4be1e2ef82d1f13c</span>   <span class="g">← identical</span></pre>
+    </div>
+
+    <div class="term">
+      <div class="term-bar"><i></i><i></i><i></i><span class="term-title">seed job (idempotent) + functional test</span></div>
+<pre class="term-body"><span class="p">$</span> <span class="c">kubectl logs -n hotel job/hotel-seed</span>
+Waiting for MongoDB to accept connections...
+MongoDB is up. Seeding hotels <span class="d">(idempotent)</span>...
+<span class="d">exists:</span>   Sunset Resort
+<span class="d">exists:</span>   Ocean View Hotel
+<span class="d">exists:</span>   Mountain Retreat
+<span class="d">exists:</span>   City Lights Inn
+total hotels: <span class="g">4</span>
+
+<span class="p">$</span> <span class="c">kubectl port-forward -n hotel svc/backend 3001:3000 &amp;</span>
+<span class="p">$</span> <span class="c">curl -s localhost:3001/health</span>
+<span class="g">{"status":"ok"}</span>
+<span class="p">$</span> <span class="c">curl -s localhost:3001/hotels</span>
+[{"name":"Sunset Resort","location":"Eilat","price_per_night":520}, <span class="d">...</span>]</pre>
+    </div>
+  </section>
+
+  <!-- 4. Incident log -->
+  <section>
+    <div class="sec-head"><span class="sec-num">04</span><h2>יומן תקלות ותיקונים</h2></div>
+    <p class="sec-sub">ה-pipeline לא עבד חלק מהרגע הראשון. שלוש תקלות אמיתיות אובחנו ותוקנו — הסמן של כל שורה הוא ה-SHA האמיתי של קומיט התיקון.</p>
+
+    <div class="incident">
+      <span class="inc-sha ltr">d321d1a</span>
+      <span class="inc-title">ImagePullBackOff</span>
+      <span class="inc-body"><b>שורש:</b> ה-Deployment הצביע על תג image <span class="mono ltr">:1</span> שלא היה קיים ב-Docker Hub, אז ה-Pod לא הצליח למשוך אותו. &nbsp;<b>תיקון:</b> הצמדה לתג <span class="mono ltr">:3</span> שקיים ב-registry.</span>
+    </div>
+
+    <div class="incident">
+      <span class="inc-sha ltr">ec041a3</span>
+      <span class="inc-title">תפריט מלונות ריק (empty dropdown)</span>
+      <span class="inc-body"><b>שורש:</b> ה-frontend לא קיבל נתונים, וה-manifests היו מפוזרים. &nbsp;<b>תיקון:</b> תיקון זרימת הנתונים + איחוד כל ה-manifests תחת <span class="mono ltr">k8s/</span>.</span>
+    </div>
+
+    <div class="incident">
+      <span class="inc-sha ltr">8ea1c09</span>
+      <span class="inc-title">ריבוי Argo CD Applications</span>
+      <span class="inc-body"><b>שורש:</b> הוגדרו כמה Applications במקום אחד. &nbsp;<b>תיקון:</b> איחוד ל-<b>Application יחיד</b> שמנהל את כל ה-stack דרך Kustomize.</span>
+    </div>
+  </section>
+
+  <!-- 5. Honesty callout -->
+  <section>
+    <div class="sec-head"><span class="sec-num">05</span><h2>מה לא נבדק בהרצה הזו</h2></div>
+    <div class="callout">
+      <span class="k">Scope &amp; honesty</span>
+      ה-CI (בנייה, smoke test ופתיחת PR ב-GitHub Actions) חי ב-repos של האפליקציה — <span class="mono ltr">hotel-backend</span> / <span class="mono ltr">hotel-frontend</span> — ולא ברפו התשתית, ולכן ה-CI עצמו לא הורץ כאן; אומתו <b>התוצרים</b> שלו (ה-PRs האוטומטיים #1 ו-#2). כמו כן לא הודמתה תקלה יזומה לבדיקת <span class="mono ltr">selfHeal</span>/<span class="mono ltr">prune</span> בזמן אמת, ולא נבדקה כניסה דרך ה-hostname <span class="mono ltr">hotel.local</span> ב-Ingress.
+    </div>
+  </section>
+
+  <footer class="foot">
+    כל הפקודות ניתנות לשחזור מלא — ראו <span class="mono">docs/VALIDATION.md</span> · Runbook בסעיף 5 של המסמך.<br>
+    אומת מול קלאסטר חי · 2026-07-12
+  </footer>
+
+</div>
+</div>
