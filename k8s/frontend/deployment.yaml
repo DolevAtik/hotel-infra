@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: hotel-frontend
-          image: dolevatik/hotel-frontend:6c1d628086b48079cce3a981d43efe18649ddeb3
+          image: dolevatik/hotel-frontend:50c86aff46d9f62379740e73177a3eea5fa11ea4
           imagePullPolicy: Always
           ports:
             - name: http
